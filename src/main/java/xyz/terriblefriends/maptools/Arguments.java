@@ -32,14 +32,25 @@ public class Arguments {
 
     private static final String STRING_NO_ARGUMENT = "No argument!";
 
-    public void processArgs(String[] args) {
+    public boolean processArgs(String[] args) {
 
         Iterator<String> argumentsIterator = Arrays.stream(args).iterator();
 
         while (argumentsIterator.hasNext()) {
             String arg = argumentsIterator.next();
 
-            if (arg.startsWith("-")) {
+            if (arg.startsWith("--")) {
+                // TODO support verbose arguments
+                switch (arg.substring(2)) {
+                    case "help":
+                        this.printUsage();
+                        return true;
+                    default:
+                        System.out.println("Unrecognized argument "+arg+"!");
+                        break;
+                }
+            }
+            else if (arg.startsWith("-")) {
                 for (char c : arg.substring(1).toCharArray()) {
                     String s;
 
@@ -48,7 +59,7 @@ public class Arguments {
                         case 'H':
                         case '?':
                             this.printUsage();
-                            break;
+                            return true;
                         case 'i':
                             if (!argumentsIterator.hasNext()) {
                                 System.out.println(STRING_NO_ARGUMENT);
@@ -148,19 +159,12 @@ public class Arguments {
                     }
                 }
             }
-            else if (arg.startsWith("--")) {
-                // TODO support verbose arguments
-                switch (arg.substring(2)) {
-                    case "help":
-                        this.printUsage();
-                        break;
-
-                    default:
-                        System.out.println("Unrecognized argument " + arg);
-                        break;
-                }
+            else {
+                System.out.println("Unrecognized argument "+arg+"!");
             }
         }
+
+        return false;
     }
 
     private void printUsage() {

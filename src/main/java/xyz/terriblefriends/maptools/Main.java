@@ -14,7 +14,10 @@ import java.util.Locale;
 public class Main {
     public static void main(String[] args) {
         try {
-            Arguments.INSTANCE.processArgs(args);
+            // returns true if the help statement is printed, so stop executing
+            if (Arguments.INSTANCE.processArgs(args)) {
+                return;
+            }
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
@@ -95,17 +98,20 @@ public class Main {
                         }
                     }
                 }
+
+                LevelFormat inputLevel = getLevelClass(Arguments.INSTANCE.inFormat, Arguments.INSTANCE.inFile);
+
+                inputLevel.read();
+
+                LevelFormat outputLevel = getLevelClass(Arguments.INSTANCE.outFormat, Arguments.INSTANCE.outFile);
+
+                outputLevel.read();
+
+                inputLevel.exportLevel(outputLevel);
             }
-
-            LevelFormat inputLevel = getLevelClass(Arguments.INSTANCE.inFormat, Arguments.INSTANCE.inFile);
-
-            inputLevel.read();
-
-            LevelFormat outputLevel = getLevelClass(Arguments.INSTANCE.outFormat, Arguments.INSTANCE.outFile);
-
-            outputLevel.read();
-
-            inputLevel.exportLevel(outputLevel);
+            else {
+                throw new UnsupportedOperationException("Not implemented yet! :(");
+            }
         }
         catch (Exception e) {
             System.err.println("Uncaught error in main thread!");
