@@ -17,8 +17,8 @@ public class IndevLevelFormat implements LevelFormat {
     public int originX = 0;
     public int originZ = 0;
 
-    public int length;
     public int width;
+    public int length;
     public int height;
     public boolean floating;
 
@@ -46,10 +46,8 @@ public class IndevLevelFormat implements LevelFormat {
 
             NBTTagCompound mapCompound = rootCompound.getCompoundTag("Map");
 
-            // this isn't intuitive at all, thx notch
-            // just gotta trust the process :/
-            this.width = mapCompound.getShort("Length");
-            this.length = mapCompound.getShort("Width");
+            this.length = mapCompound.getShort("Length");
+            this.width = mapCompound.getShort("Width");
 
             this.height = mapCompound.getShort("Height");
 
@@ -70,7 +68,15 @@ public class IndevLevelFormat implements LevelFormat {
             }
             else {
                 // day time was slightly different in indev, so this adjusts it to be close enough to the original time of day
+                // start 0 -> 2000
+                // noon 3590 ~ 4000 -> 6000
+                // sunset 10000 -> 12000
+                // midnight 15602 -> 17600
+                // dawn 21568 -> 23500
                 this.levelData.time = environmentCompound.getShort("TimeOfDay") + 2000;
+                if (this.levelData.time >= 24000) {
+                    this.levelData.time -= 24000;
+                }
             }
 
             // this works for default level types, and probably is close enough if you customized your level too.
@@ -97,6 +103,7 @@ public class IndevLevelFormat implements LevelFormat {
         catch (Exception e) {
             System.err.println("Failed to read indev level "+this.levelFile.getAbsolutePath()+"!");
             e.printStackTrace();
+            throw e;
         }
     }
 
@@ -135,13 +142,21 @@ public class IndevLevelFormat implements LevelFormat {
 
     @Override
     public void exportLevel(LevelFormat to) throws Exception {
+        if (this.width % 16 != 0 || this.length % 16 != 0) {
+            throw new IllegalStateException("Cannot convert Indev levels with a length or width that is not a multiple of 16! Sorry :(");
+        }
+
+        if (this.height > 128) {
+            throw new UnsupportedOperationException("Upgrading levels with a height more than 128 is not yet supported!");
+        }
+
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
-        // fix height really only matters for height 64 as otherwise we'd be removing things - obviously we don't want that!
-        this.fixHeight = this.height == 64;
+        // don't fix height for worlds taller than 96 blocks, otherwise we'd be removing things - obviously we don't want that!
+        this.fixHeight = this.height <= 96;
 
         if (this.fixHeight) {
-            if (!Arguments.INSTANCE.indevFixHeight.isPresent()) {
+            if (Arguments.INSTANCE.indevFixHeight.isEmpty()) {
                 System.out.println("Do you wish to enable the height fix? (Y/N)");
                 System.out.println("This will move the world up to y 32.");
                 System.out.println("This is recommended on non-deep worlds to allow sea levels to match with new terrain.");
@@ -153,7 +168,7 @@ public class IndevLevelFormat implements LevelFormat {
             }
         }
 
-        if (!Arguments.INSTANCE.finiteOrigin.isPresent()) {
+        if (Arguments.INSTANCE.finiteOrigin.isEmpty()) {
             System.out.println("Do you wish to change the origin of the world's placement? (Y/N)");
             System.out.println("This is useful if you wish to combine multiple Classic or Indev saves into one map.");
 
@@ -184,7 +199,7 @@ public class IndevLevelFormat implements LevelFormat {
             this.originZ = pos.z;
         }
 
-        if (!Arguments.INSTANCE.exportLevelData.isPresent()) {
+        if (Arguments.INSTANCE.exportLevelData.isEmpty()) {
             System.out.println("Do you wish to export level info? (Y/N)");
             System.out.println("This is the player, seed, world spawn, and time.");
 
@@ -195,7 +210,7 @@ public class IndevLevelFormat implements LevelFormat {
         }
 
         if (this.exportLevelInfo) {
-            if (!Arguments.INSTANCE.seed.isPresent()) {
+            if (Arguments.INSTANCE.seed.isEmpty()) {
                 System.out.println("Please choose a world seed: (r for random)");
                 while (true) {
                     String s2 = reader.readLine().toLowerCase();
@@ -215,7 +230,7 @@ public class IndevLevelFormat implements LevelFormat {
             }
         }
 
-        if (!Arguments.INSTANCE.indevFixMarkPopulated.isPresent()) {
+        if (Arguments.INSTANCE.indevFixMarkPopulated.isEmpty()) {
             System.out.println("Do you wish to mark all chunks as populated? (Y/N)");
             System.out.println("This will protect most of your world, except for the northern and western most 8 blocks.");
             System.out.println("Will not work for Infdev 20100327.");
@@ -226,7 +241,7 @@ public class IndevLevelFormat implements LevelFormat {
             this.fixMarkPopulated = Arguments.INSTANCE.indevFixMarkPopulated.get();
         }
 
-        if (!Arguments.INSTANCE.indevFixCloth.isPresent()) {
+        if (Arguments.INSTANCE.indevFixCloth.isEmpty()) {
             System.out.println("Do you wish to convert cloth to wool? (Y/N)");
             System.out.println("This will only convert placed blocks, for the purposes of preserving builds / art.");
             System.out.println("Of course, the color matching is best effort - perfect color matching is impossible.");
@@ -240,19 +255,11 @@ public class IndevLevelFormat implements LevelFormat {
 
         System.out.println("Converting to chunks...");
 
-        if (this.length % 16 != 0 || this.width % 16 != 0) {
-            throw new IllegalStateException("Cannot convert Indev levels with a length, width, or height that is not a multiple of 16! Sorry :(");
-        }
-
-        if (this.height == 256) {
-            throw new UnsupportedOperationException("Upgrading levels with a height of 256 is not yet supported!");
-        }
-
         // init new alpha chunks
-        AlphaChunk[][] chunkArray = new AlphaChunk[this.length / 16][this.width / 16];
+        AlphaChunk[][] chunkArray = new AlphaChunk[this.width / 16][this.length / 16];
 
-        for (int chunkX = 0; chunkX < this.length / 16; chunkX++) {
-            for (int chunkZ = 0; chunkZ < this.width / 16; chunkZ++) {
+        for (int chunkX = 0; chunkX < this.width / 16; chunkX++) {
+            for (int chunkZ = 0; chunkZ < this.length / 16; chunkZ++) {
                 AlphaChunk chunk = new AlphaChunk();
                 chunk.xPos = chunkX + this.originX;
                 chunk.zPos = chunkZ + this.originZ;
@@ -263,55 +270,50 @@ public class IndevLevelFormat implements LevelFormat {
         }
 
         // get blocks from indev and copy into new chunks
-        int blockX = 0;
-        int blockY = this.fixHeight ? 32 : 0;
-        int blockZ = 0;
 
-        for (int blockIndex = 0; blockIndex < this.blocks.length; blockIndex++) {
-            AlphaChunk c = chunkArray[blockX / 16][blockZ / 16];
+        for (int blockY = this.fixHeight ? 32 : 0; blockY < this.height + (this.fixHeight ? 32 : 0); blockY++) {
+            for (int blockZ = 0; blockZ < this.length; blockZ++) {
+                for (int blockX = 0; blockX < this.width; blockX++) {
+                    AlphaChunk c = chunkArray[blockX / 16][blockZ / 16];
+                    int blockIndex = (blockY * this.length + blockZ) * this.width + blockX;
 
-            int id = this.blocks[blockIndex];
-            int dv = this.blockDvs[blockIndex] >> 4;
-            int light = this.blockDvs[blockIndex] & 15;
+                    int id = this.blocks[blockIndex];
 
-            // wool conversion dvs debug
-            /*if (id != 0) {
-                id = 35;
-            }*/
+                    int dv = (this.blockDvs[blockIndex] >>> 4) & 15;
+                    int light = this.blockDvs[blockIndex] & 15;
 
-            if (this.fixCloth && FIX_CLOTH.containsKey(id)) {
-                dv = FIX_CLOTH.get(id);
-                id = 35;
-            }
+                    // wool conversion dvs debug
+                    /*if (id != 0) {
+                        id = 35;
+                    }*/
 
-            if (this.warnDangerousBlocks && ((!this.fixCloth && FIX_CLOTH.containsKey(id) && id != 35) || id == 52 || id == 53 || id == 55)) {
-                System.out.println("WARNING: You have dangerous blocks placed in your world!");
-                System.out.println("These are blocks that had their IDs removed in Infdev 20100624, and were later recycled.");
-                System.out.println("More specifically, this is cloth, infinite water, infinite lava, and gears.");
-                System.out.println("Loading them in versions where they don't exist will softlock you until you update to a version where they exist.");
-                System.out.println("You can safely store them in chests, as long as you don't open them.");
-                System.out.println("This message won't repeat for every block, but here's the first that triggered it:");
-                System.out.printf("X: %d Y: %d Z: %d%n", blockX, blockY, blockZ);
-                this.warnDangerousBlocks = false;
-            }
+                    if (this.fixCloth && FIX_CLOTH.containsKey(id)) {
+                        dv = FIX_CLOTH.get(id);
+                        id = 35;
+                    }
 
-            c.setBlock(blockX % 16, blockY, blockZ % 16, id, dv);
-            c.setBlockLight(blockX % 16, blockY, blockZ % 16, light);
+                    if (this.warnDangerousBlocks && ((!this.fixCloth && FIX_CLOTH.containsKey(id) && id != 35) || id == 52 || id == 53 || id == 55)) {
+                        System.out.println("WARNING: You have dangerous blocks placed in your world!");
+                        System.out.println("These are blocks that had their IDs removed in Infdev 20100624, and were later recycled.");
+                        System.out.println("More specifically, this is cloth, infinite water, infinite lava, and gears.");
+                        System.out.println("Loading them in versions where they don't exist will softlock you until you update to a version where their IDs were reused.");
+                        System.out.println("You can safely store them in chests, as long as you don't open them.");
+                        System.out.println("This message won't repeat for every block, but here's the first that triggered it:");
+                        System.out.printf("X: %d Y: %d Z: %d%n", blockX, blockY, blockZ);
+                        this.warnDangerousBlocks = false;
+                    }
 
-            if (++blockX == this.length) {
-                blockX = 0;
-                if (++blockZ == this.width) {
-                    blockZ = 0;
-                    blockY++;
+                    c.setBlock(blockX % 16, blockY, blockZ % 16, id, dv);
+                    c.setBlockLight(blockX % 16, blockY, blockZ % 16, light);
                 }
             }
         }
 
         if (this.fixHeight) {
             int fillId = this.floating ? 0 : 1;
-            for (blockX = 0; blockX < this.length; blockX++) {
-                for (blockY = 0; blockY < 32; blockY++) {
-                    for (blockZ = 0; blockZ < this.width; blockZ++) {
+            for (int blockX = 0; blockX < this.width; blockX++) {
+                for (int blockY = 0; blockY < 32; blockY++) {
+                    for (int blockZ = 0; blockZ < this.length; blockZ++) {
                         AlphaChunk c = chunkArray[blockX / 16][blockZ / 16];
                         c.setBlock(blockX % 16, blockY, blockZ % 16, fillId, 0);
                     }
@@ -376,14 +378,8 @@ public class IndevLevelFormat implements LevelFormat {
             }
 
             // put the entity into its respective chunk
-
             int chunkX = MathHelper.floor(entityX / 16);
             int chunkZ = MathHelper.floor(entityZ / 16);
-
-            if (id.equals("Painting")) {
-                System.out.println("[DEBUG] entity pos "+entityX+" "+entityZ);
-                System.out.println("[DEBUG] entity chunk "+chunkX+" "+chunkZ);
-            }
 
             AlphaChunk c = this.getChunk(chunkX, chunkZ);
 
@@ -407,8 +403,6 @@ public class IndevLevelFormat implements LevelFormat {
             int chunkX = MathHelper.floor(tileX / 16d);
             int chunkZ = MathHelper.floor(tileZ / 16d);
 
-            //System.out.println("[DEBUG] entity chunk "+chunkX+" "+chunkZ+" "+tileX+" "+tileZ);
-
             AlphaChunk c = this.getChunk(chunkX, chunkZ);
 
             if (c != null) {
@@ -416,7 +410,7 @@ public class IndevLevelFormat implements LevelFormat {
             }
         }
 
-        System.out.println("Writing to new format...");
+        System.out.println("Preparing to write...");
 
         // set chunks in new format
         for (AlphaChunk c : this.chunks) {
@@ -431,7 +425,7 @@ public class IndevLevelFormat implements LevelFormat {
                     System.out.println("WARNING: You have dangerous blocks in your inventory!");
                     System.out.println("These are blocks that had their IDs removed in Infdev 20100624, and were later recycled.");
                     System.out.println("More specifically, this is cloth, infinite water, infinite lava, and gears.");
-                    System.out.println("Loading them in versions where they don't exist will softlock you until you update to a version where they exist.");
+                    System.out.println("Loading them in versions where they don't exist will softlock you until you update to a version where their IDs were reused.");
                     System.out.println("You can safely store them in chests, as long as you don't open them.");
                     break;
                 }
@@ -454,7 +448,7 @@ public class IndevLevelFormat implements LevelFormat {
     }
 
     private int getBlockIndex(int x, int y, int z) {
-        return x + (z * this.length) + (y * this.length * this.width);
+        return x + (z * this.width) + (y * this.width * this.length);
     }
 
     static {

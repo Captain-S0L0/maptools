@@ -208,18 +208,23 @@ public class Arguments {
         LevelFormats r;
         switch (s) {
             case "classic":
+            case "c":
                 r = LevelFormats.CLASSIC;
                 break;
             case "indev":
+            case "i":
                 r = LevelFormats.INDEV;
                 break;
             case "alpha":
+            case "a":
                 r = LevelFormats.ALPHA;
                 break;
             case "mcregion":
+            case "r":
                 r = LevelFormats.MCREGION;
                 break;
             case "mcanvil":
+            case "m":
                 r = LevelFormats.MCANVIL;
                 break;
             default:

@@ -23,15 +23,15 @@ public class Main {
 
             if (Arguments.INSTANCE.operation == Operation.NOOP) {
                 System.out.println("No operation selected! Please choose one:");
-                System.out.println("Recognized options are: convert, edit");
+                System.out.println("Recognized options are: (c)onvert, (e)dit");
 
                 while (true) {
                     String option = reader.readLine().toLowerCase(Locale.ROOT);
-                    if (option.equals("convert")) {
+                    if (option.equals("convert") || option.equals("c")) {
                         Arguments.INSTANCE.operation = Operation.CONVERT;
                         break;
                     }
-                    if (option.equals("edit")) {
+                    if (option.equals("edit") || option.equals("e")) {
                         Arguments.INSTANCE.operation = Operation.EDIT;
                         break;
                     }
@@ -60,7 +60,8 @@ public class Main {
             if (Arguments.INSTANCE.inFormat == LevelFormats.INVALID) {
                 System.out.println("WARNING: No valid format was detected for the input world!");
                 System.out.println("You can manually input one here if you know what you're doing, but you should probably check the path you specified first.");
-                System.out.println("Recognized options: classic, indev, alpha, mcregion, mcanvil");
+                System.out.println("Input path was: " + Arguments.INSTANCE.inFile.getAbsolutePath());
+                System.out.println("Recognized options: (c)lassic, (i)ndev, (a)lpha, mc(r)egion, (m)canvil");
 
                 do {
                     Arguments.INSTANCE.inFormat = Arguments.INSTANCE.stringToFormat(reader.readLine().toLowerCase(Locale.ROOT));
@@ -72,15 +73,25 @@ public class Main {
                     System.out.println("No output world selected! Please enter the path:");
                     System.out.println("(can be absolute or relative to current working directory)");
 
-                    Arguments.INSTANCE.outFile = new File(reader.readLine());
+                    while (true) {
+                        String outPath = reader.readLine();
 
-                    if (Arguments.INSTANCE.outFile.exists()) {
-                        System.out.println("WARNING: Output world exists! Overwriting may occur!");
-                        System.out.println("Proceed? (Y/N)");
-
-                        if (!Arguments.askYesNo(reader)) {
-                            return;
+                        if (outPath.trim().isEmpty()) {
+                            System.out.println("Provided path was empty!");
+                            continue;
                         }
+
+                        Arguments.INSTANCE.outFile = new File(outPath);
+
+                        if (Arguments.INSTANCE.outFile.exists()) {
+                            System.out.println("WARNING: Output world exists! Overwriting may occur!");
+                            System.out.println("Proceed? (Y/N)");
+
+                            if (!Arguments.askYesNo(reader)) {
+                                return;
+                            }
+                        }
+                        break;
                     }
 
                     Arguments.INSTANCE.outFormat = Arguments.INSTANCE.determineFormat(Arguments.INSTANCE.outFile);
@@ -88,7 +99,7 @@ public class Main {
 
                 if (Arguments.INSTANCE.outFormat == LevelFormats.INVALID || Arguments.INSTANCE.outFormat == LevelFormats.FILENOTFOUND) {
                     System.out.println("Choose the format of the output world:");
-                    System.out.println("Recognized options: classic, indev, alpha, mcregion, mcanvil");
+                    System.out.println("Recognized options: (c)lassic, (i)ndev, (a)lpha, mc(r)egion, (m)canvil");
 
                     while (true) {
                         Arguments.INSTANCE.outFormat = Arguments.INSTANCE.stringToFormat(reader.readLine().toLowerCase(Locale.ROOT));
@@ -117,6 +128,8 @@ public class Main {
             System.err.println("Uncaught error in main thread!");
             e.printStackTrace();
         }
+
+        System.out.println("Goodbye!");
     }
 
     private static LevelFormat getLevelClass(LevelFormats format, File f) {
